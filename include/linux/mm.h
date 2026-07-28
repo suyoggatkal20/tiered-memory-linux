@@ -1836,6 +1836,11 @@ static inline struct folio *folio_get_nontail_page(struct page *page)
 
 extern int page_is_ram(unsigned long pfn);
 
+#ifdef CONFIG_TIERED_MEMORY
+#include <linux/atomic.h>
+extern atomic_t *tiered_page_counters;
+#endif
+
 enum {
 	REGION_INTERSECTS,
 	REGION_DISJOINT,

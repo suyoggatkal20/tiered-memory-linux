@@ -1403,6 +1403,21 @@ static __always_inline bool __free_pages_prepare(struct page *page,
 	page_cpupid_reset_last(page);
 	page->flags.f &= ~PAGE_FLAGS_CHECK_AT_PREP;
 	page->private = 0;
+#ifdef CONFIG_TIERED_MEMORY
+	{
+		atomic_t *counters;
+
+		rcu_read_lock();
+		counters = rcu_dereference_raw(tiered_page_counters);
+		if (counters) {
+			int i;
+			unsigned long pfn = page_to_pfn(page);
+			for (i = 0; i < (1 << order); i++)
+				atomic_set(&counters[pfn + i], 0);
+		}
+		rcu_read_unlock();
+	}
+#endif
 	reset_page_owner(page, order);
 	page_table_check_free(page, order);
 	pgalloc_tag_sub(page, 1 << order);

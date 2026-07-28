@@ -1509,6 +1509,15 @@ config LAZY_MMU_MODE_KUNIT_TEST
 
 	  If unsure, say N.
 
+config TIERED_MEMORY
+	bool "Modular Tiered Memory Framework"
+	depends on NUMA && MIGRATION
+	default n
+	help
+	  This option enables a modular and extensible tiered memory framework
+	  that distinguishes between fast DRAM and slow CXL-like memory (via
+	  NUMA emulation), using PEBS-based access counters.
+
 source "mm/damon/Kconfig"
 
 endmenu

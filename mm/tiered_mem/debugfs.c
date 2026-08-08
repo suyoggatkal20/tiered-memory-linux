@@ -18,6 +18,7 @@ static int stats_show(struct seq_file *m, void *v)
 	seq_printf(m, "\nPEBS Statistics Collector:\n");
 	seq_printf(m, "  Sampling Interval: %u ms\n", sampling_interval);
 	seq_printf(m, "  Samples per Interval: %u\n", samples_per_interval);
+	seq_printf(m, "  Software Sampler Max Scan: %u pages\n", max_scan);
 	seq_printf(m, "  Total PEBS Samples: %llu\n", total_pebs_samples);
 	seq_printf(m, "  Total PEBS Errors: %llu\n", total_pebs_errors);
 

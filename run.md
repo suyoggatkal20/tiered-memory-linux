@@ -9,6 +9,10 @@ numactl --hardware
 
 sudo ./qemu_setup/run_qemu.sh
 
+# echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+# systemctl restart ssh
+# systemctl restart ssh
+
 
 cd /sys/kernel/tiered_memory
 echo 0 > dram_nodes

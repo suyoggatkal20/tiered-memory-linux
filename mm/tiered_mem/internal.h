@@ -22,6 +22,7 @@ extern unsigned int ageing_factor;
 extern unsigned int ktierd_interval;
 extern unsigned int promotion_batch;
 extern unsigned int demotion_batch;
+extern unsigned int max_scan;
 extern u64 pebs_event_config;
 extern bool ageing_enabled;
 extern bool ktierd_enabled;

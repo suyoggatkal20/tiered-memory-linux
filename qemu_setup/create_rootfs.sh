@@ -133,4 +133,4 @@ echo "[+] Autologin is configured on serial console ttyS0."
 
 # echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 # systemctl restart ssh
-
+# systemctl restart ssh

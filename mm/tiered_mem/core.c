@@ -27,6 +27,7 @@ unsigned int ageing_factor = 50;
 unsigned int ktierd_interval = 2000;
 unsigned int promotion_batch = 128;
 unsigned int demotion_batch = 128;
+unsigned int max_scan = 100000;
 u64 pebs_event_config = 0x20d1; /* MEM_TRANS_RETIRED.LATENCY_ABOVE_THRESHOLD */
 bool ageing_enabled = true;
 bool ktierd_enabled = true;
@@ -273,6 +274,8 @@ TIERED_ATTR_RW_UINT(promotion_batch, 1, 10000)
 TIERED_ATTR_RW_UINT(demotion_batch, 1, 10000)
 TIERED_ATTR_RW_UINT(hot_threshold, 0, UINT_MAX)
 TIERED_ATTR_RW_UINT(cold_threshold, 0, UINT_MAX)
+TIERED_ATTR_RW_UINT(max_scan, 1, UINT_MAX)
+
 
 static ssize_t verbose_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
@@ -375,6 +378,7 @@ static struct attribute *tiered_mem_attrs[] = {
 	&ktierd_enabled_attribute.attr,
 	&pebs_event_config_attribute.attr,
 	&policy_attribute.attr,
+	&max_scan_attribute.attr,
 	NULL,
 };
 

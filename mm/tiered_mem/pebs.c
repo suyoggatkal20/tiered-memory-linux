@@ -236,7 +236,6 @@ static void tiered_software_sampler_fn(struct work_struct *work)
 {
 	unsigned long pfn;
 	int scanned = 0;
-	int max_scan = 10000; /* scan at most 10k pages per interval */
 	static unsigned long next_pfn = 0;
 
 	if (!tiered_mem_enabled)

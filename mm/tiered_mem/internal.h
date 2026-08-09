@@ -43,6 +43,9 @@ extern u64 safety_check_failures;
 extern unsigned int hot_threshold;
 extern unsigned int cold_threshold;
 
+extern struct bpf_prog *tiered_ebpf_prog;
+extern struct mutex tiered_ebpf_mutex;
+
 extern struct mutex tiered_mem_config_mutex;
 
 /* Policy structure */

@@ -9,10 +9,15 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/rcupdate.h>
+#include <linux/filter.h>
+#include <linux/bpf.h>
 #include "internal.h"
 
 atomic_t *tiered_page_counters;
 EXPORT_SYMBOL_GPL(tiered_page_counters);
+
+struct bpf_prog __rcu *tiered_ebpf_prog = NULL;
+DEFINE_MUTEX(tiered_ebpf_mutex);
 
 /* Global configuration variables */
 bool tiered_mem_enabled = false;
@@ -360,6 +365,53 @@ static ssize_t policy_store(struct kobject *kobj, struct kobj_attribute *attr, c
 }
 static struct kobj_attribute policy_attribute = __ATTR_RW(policy);
 
+static ssize_t ebpf_prog_fd_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	ssize_t ret;
+	mutex_lock(&tiered_ebpf_mutex);
+	ret = sysfs_emit(buf, "%s\n", rcu_access_pointer(tiered_ebpf_prog) ? "attached" : "detached");
+	mutex_unlock(&tiered_ebpf_mutex);
+	return ret;
+}
+
+static ssize_t ebpf_prog_fd_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int fd;
+	struct bpf_prog *prog = NULL;
+	struct bpf_prog *old_prog;
+	int err;
+
+	err = kstrtoint(buf, 10, &fd);
+	if (err)
+		return err;
+
+	if (fd >= 0) {
+		prog = bpf_prog_get_type(fd, BPF_PROG_TYPE_TIERED_MEM);
+		if (IS_ERR(prog)) {
+			pr_err("tiered_mem: failed to get BPF program from fd %d: %ld\n", fd, PTR_ERR(prog));
+			return PTR_ERR(prog);
+		}
+	}
+
+	mutex_lock(&tiered_ebpf_mutex);
+	old_prog = rcu_dereference_protected(tiered_ebpf_prog, lockdep_is_held(&tiered_ebpf_mutex));
+	rcu_assign_pointer(tiered_ebpf_prog, prog);
+	mutex_unlock(&tiered_ebpf_mutex);
+
+	if (old_prog) {
+		synchronize_rcu();
+		bpf_prog_put(old_prog);
+	}
+
+	if (prog)
+		pr_info("tiered_mem: successfully attached eBPF policy\n");
+	else
+		pr_info("tiered_mem: detached eBPF policy\n");
+
+	return count;
+}
+static struct kobj_attribute ebpf_prog_fd_attribute = __ATTR_RW(ebpf_prog_fd);
+
 static struct attribute *tiered_mem_attrs[] = {
 	&enable_attribute.attr,
 	&dram_nodes_attribute.attr,
@@ -379,6 +431,7 @@ static struct attribute *tiered_mem_attrs[] = {
 	&pebs_event_config_attribute.attr,
 	&policy_attribute.attr,
 	&max_scan_attribute.attr,
+	&ebpf_prog_fd_attribute.attr,
 	NULL,
 };
 

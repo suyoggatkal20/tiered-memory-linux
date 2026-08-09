@@ -5,6 +5,8 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/sched.h>
+#include <linux/filter.h>
+#include <linux/bpf.h>
 #include "internal.h"
 #include "../internal.h"
 
@@ -110,7 +112,33 @@ static int default_get_hot_pages(int page_count, struct list_head *list)
 				if (page && !PageTail(page)) {
 					folio = page_folio(page);
 					int access_count = tiered_page_counters ? atomic_read(&tiered_page_counters[pfn]) : 0;
-					if (access_count >= hot_threshold &&
+					bool should_migrate = false;
+
+					if (rcu_access_pointer(tiered_ebpf_prog)) {
+						struct tiered_mem_ebpf_ctx ctx = {
+							.pfn = pfn,
+							.nid = nid,
+							.access_count = access_count,
+							.is_lru = folio_test_lru(folio) ? 1 : 0,
+							.is_active = folio_test_active(folio) ? 1 : 0,
+						};
+						struct bpf_prog *prog;
+						u32 decision = 0;
+
+						rcu_read_lock();
+						prog = rcu_dereference(tiered_ebpf_prog);
+						if (prog)
+							decision = bpf_prog_run(prog, &ctx);
+						rcu_read_unlock();
+
+						if (decision == 1) /* 1 = promote */
+							should_migrate = true;
+					} else {
+						if (access_count >= hot_threshold)
+							should_migrate = true;
+					}
+
+					if (should_migrate &&
 					    folio_test_lru(folio) &&
 					    !folio_test_reserved(folio) &&
 					    !folio_test_mlocked(folio) &&
@@ -187,7 +215,33 @@ static int default_get_cold_pages(int page_count, struct list_head *list)
 				if (page && !PageTail(page)) {
 					folio = page_folio(page);
 					int access_count = tiered_page_counters ? atomic_read(&tiered_page_counters[pfn]) : 0;
-					if (access_count <= cold_threshold &&
+					bool should_migrate = false;
+
+					if (rcu_access_pointer(tiered_ebpf_prog)) {
+						struct tiered_mem_ebpf_ctx ctx = {
+							.pfn = pfn,
+							.nid = nid,
+							.access_count = access_count,
+							.is_lru = folio_test_lru(folio) ? 1 : 0,
+							.is_active = folio_test_active(folio) ? 1 : 0,
+						};
+						struct bpf_prog *prog;
+						u32 decision = 0;
+
+						rcu_read_lock();
+						prog = rcu_dereference(tiered_ebpf_prog);
+						if (prog)
+							decision = bpf_prog_run(prog, &ctx);
+						rcu_read_unlock();
+
+						if (decision == 2) /* 2 = demote */
+							should_migrate = true;
+					} else {
+						if (access_count <= cold_threshold)
+							should_migrate = true;
+					}
+
+					if (should_migrate &&
 					    folio_test_lru(folio) &&
 					    !folio_test_reserved(folio) &&
 					    !folio_test_mlocked(folio) &&

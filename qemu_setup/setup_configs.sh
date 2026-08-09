@@ -41,6 +41,13 @@ echo "[+] Tuning kernel configuration for Tiered Memory and GDB Debugging..."
 ./scripts/config --enable CONFIG_STACK_TRACER
 ./scripts/config --enable CONFIG_DYNAMIC_DEBUG
 
+# eBPF Configuration
+./scripts/config --enable CONFIG_BPF
+./scripts/config --enable CONFIG_BPF_SYSCALL
+./scripts/config --enable CONFIG_BPF_JIT
+./scripts/config --enable CONFIG_BPF_EVENTS
+./scripts/config --enable CONFIG_DEBUG_INFO_BTF
+
 # Apply changes and generate updated config
 echo "[+] Running 'make olddefconfig' to finalize config dependencies..."
 make olddefconfig

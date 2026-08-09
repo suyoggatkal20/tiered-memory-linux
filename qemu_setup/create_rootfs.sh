@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="$SCRIPT_DIR/ubuntu-rootfs.img"
-IMAGE_SIZE="4G"
+IMAGE_SIZE="7G"
 MOUNT_DIR="$SCRIPT_DIR/mnt_rootfs"
 RELEASE="jammy" # Ubuntu 22.04 LTS
 
@@ -43,7 +43,7 @@ trap cleanup EXIT
 echo "[+] Running debootstrap for Ubuntu $RELEASE (this may take a few minutes)..."
 # Installs core utilities plus benchmark and diagnostics tools
 debootstrap --arch=amd64 \
-            --include=systemd,udev,dbus,iproute2,netplan.io,kmod,sudo,openssh-server,numactl,pciutils,procps,iputils-ping,nano,curl \
+            --include=systemd,udev,dbus,iproute2,netplan.io,kmod,sudo,openssh-server,numactl,pciutils,procps,iputils-ping,nano,curl,gcc,make,clang,llvm,libbpf-dev,libelf-dev \
             "$RELEASE" "$MOUNT_DIR" http://archive.ubuntu.com/ubuntu/
 
 echo "[+] Configuring system files..."

@@ -1093,6 +1093,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_SK_LOOKUP,
 	BPF_PROG_TYPE_SYSCALL, /* a program that can execute syscalls */
 	BPF_PROG_TYPE_NETFILTER,
+	BPF_PROG_TYPE_TIERED_MEM,
 	__MAX_BPF_PROG_TYPE
 };
 
@@ -6359,6 +6360,14 @@ enum {
 	/* For any future BPF_SKB_CLOCK_* that the bpf prog cannot handle,
 	 * the bpf prog can try to deduce it by ingress/egress/skb->sk->sk_clockid.
 	 */
+};
+
+struct tiered_mem_ebpf_ctx {
+	__u64 pfn;
+	__u32 nid;
+	__u32 access_count;
+	__u32 is_lru;
+	__u32 is_active;
 };
 
 /* user accessible mirror of in-kernel sk_buff.

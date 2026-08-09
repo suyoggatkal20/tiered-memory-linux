@@ -97,6 +97,7 @@ echo "    Memory Node 1 (CXL): $MEM_SIZE_NODE1 (CPU-less)"
 
 exec $QEMU_CMD \
     $KVM_FLAGS \
+    -snapshot \
     "${NUMA_FLAGS[@]}" \
     "${NET_FLAGS[@]}" \
     "${DISK_FLAGS[@]}" \

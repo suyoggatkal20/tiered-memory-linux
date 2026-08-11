@@ -6143,6 +6143,9 @@ union bpf_attr {
 	FN(user_ringbuf_drain, 209, ##ctx)		\
 	FN(cgrp_storage_get, 210, ##ctx)		\
 	FN(cgrp_storage_delete, 211, ##ctx)		\
+	FN(tiered_mem_create_page_counters, 212, ##ctx)	\
+	FN(tiered_mem_inc_page_counter, 213, ##ctx)	\
+	FN(tiered_mem_get_page_counter, 214, ##ctx)	\
 	/* This helper list is effectively frozen. If you are trying to	\
 	 * add a new helper, you should add a kfunc instead which has	\
 	 * less stability guarantees. See Documentation/bpf/kfuncs.rst	\
@@ -6363,11 +6366,17 @@ enum {
 };
 
 struct tiered_mem_ebpf_ctx {
-	__u64 pfn;
-	__u32 nid;
-	__u32 access_count;
-	__u32 is_lru;
-	__u32 is_active;
+	__u64 pfn;		/* page frame number */
+	__u32 nid;		/* NUMA node id where the page resides */
+	__u32 access_count;	/* PEBS/sampler access count for this page */
+	__u32 is_lru;		/* 1 if page is on LRU list */
+	__u32 is_active;	/* 1 if page is on the active LRU */
+	__u32 page_order;	/* compound page order (0 for base pages) */
+	__u32 is_referenced;	/* 1 if page has PG_referenced set */
+	__u32 is_dirty;		/* 1 if page is dirty */
+	__u32 is_writeback;	/* 1 if page is under writeback */
+	__u64 zone_free_pages;	/* free pages in the page's zone */
+	__u64 node_total_pages;	/* total managed pages on this node */
 };
 
 /* user accessible mirror of in-kernel sk_buff.

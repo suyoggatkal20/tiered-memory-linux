@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Custom wget wrapper that retries the entire download up to 5 times if it fails.
+MAX_RETRIES=5
+RETRY_COUNT=0
+EXIT_CODE=1
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    /usr/bin/wget --tries=5 --timeout=20 --waitretry=1 "$@"
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 0 ]; then
+        exit 0
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    echo "[wget-wrapper] Download failed with exit code $EXIT_CODE. Retrying $RETRY_COUNT/$MAX_RETRIES..." >&2
+    sleep 1
+done
+
+exit $EXIT_CODE

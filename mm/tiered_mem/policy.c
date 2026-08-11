@@ -7,6 +7,8 @@
 #include <linux/sched.h>
 #include <linux/filter.h>
 #include <linux/bpf.h>
+#include <linux/mm.h>
+#include <linux/page-flags.h>
 #include "internal.h"
 #include "../internal.h"
 
@@ -111,7 +113,7 @@ static int default_get_hot_pages(int page_count, struct list_head *list)
 				page = pfn_to_online_page(pfn);
 				if (page && !PageTail(page)) {
 					folio = page_folio(page);
-					int access_count = tiered_page_counters ? atomic_read(&tiered_page_counters[pfn]) : 0;
+					int access_count = tiered_mem_get_access_count(pfn);
 					bool should_migrate = false;
 
 					if (rcu_access_pointer(tiered_ebpf_prog)) {
@@ -121,6 +123,12 @@ static int default_get_hot_pages(int page_count, struct list_head *list)
 							.access_count = access_count,
 							.is_lru = folio_test_lru(folio) ? 1 : 0,
 							.is_active = folio_test_active(folio) ? 1 : 0,
+							.page_order = folio_order(folio),
+							.is_referenced = folio_test_referenced(folio) ? 1 : 0,
+							.is_dirty = folio_test_dirty(folio) ? 1 : 0,
+							.is_writeback = folio_test_writeback(folio) ? 1 : 0,
+							.zone_free_pages = zone_page_state(page_zone(page), NR_FREE_PAGES),
+							.node_total_pages = NODE_DATA(nid)->node_present_pages,
 						};
 						struct bpf_prog *prog;
 						u32 decision = 0;
@@ -148,6 +156,8 @@ static int default_get_hot_pages(int page_count, struct list_head *list)
 						if (folio_isolate_lru(folio)) {
 							list_add_tail(&folio->lru, list);
 							isolated++;
+							if (tiered_mem_verbose)
+								pr_info("tiered_mem: policy promoting hot page pfn %lu (access_count=%d)\n", pfn, access_count);
 						} else {
 							safety_check_failures++;
 						}
@@ -214,7 +224,7 @@ static int default_get_cold_pages(int page_count, struct list_head *list)
 				page = pfn_to_online_page(pfn);
 				if (page && !PageTail(page)) {
 					folio = page_folio(page);
-					int access_count = tiered_page_counters ? atomic_read(&tiered_page_counters[pfn]) : 0;
+					int access_count = tiered_mem_get_access_count(pfn);
 					bool should_migrate = false;
 
 					if (rcu_access_pointer(tiered_ebpf_prog)) {
@@ -224,6 +234,12 @@ static int default_get_cold_pages(int page_count, struct list_head *list)
 							.access_count = access_count,
 							.is_lru = folio_test_lru(folio) ? 1 : 0,
 							.is_active = folio_test_active(folio) ? 1 : 0,
+							.page_order = folio_order(folio),
+							.is_referenced = folio_test_referenced(folio) ? 1 : 0,
+							.is_dirty = folio_test_dirty(folio) ? 1 : 0,
+							.is_writeback = folio_test_writeback(folio) ? 1 : 0,
+							.zone_free_pages = zone_page_state(page_zone(page), NR_FREE_PAGES),
+							.node_total_pages = NODE_DATA(nid)->node_present_pages,
 						};
 						struct bpf_prog *prog;
 						u32 decision = 0;

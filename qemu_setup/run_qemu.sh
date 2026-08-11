@@ -43,6 +43,7 @@ QEMU_CMD="qemu-system-x86_64"
 KVM_FLAGS=""
 if [ -c /dev/kvm ] && [ -w /dev/kvm ]; then
     echo "[+] KVM acceleration is available and writable. Enabling KVM..."
+    # KVM_FLAGS="-enable-kvm -cpu host,pmu=on,pebs"
     KVM_FLAGS="-enable-kvm -cpu host"
 else
     echo "[!] Warning: KVM acceleration not available or not writable by current user."
@@ -97,7 +98,6 @@ echo "    Memory Node 1 (CXL): $MEM_SIZE_NODE1 (CPU-less)"
 
 exec $QEMU_CMD \
     $KVM_FLAGS \
-    -snapshot \
     "${NUMA_FLAGS[@]}" \
     "${NET_FLAGS[@]}" \
     "${DISK_FLAGS[@]}" \

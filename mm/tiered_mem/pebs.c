@@ -86,12 +86,45 @@ static void tiered_pebs_overflow_handler(struct perf_event *event,
 		if (mm) {
 			pfn = virt_to_pfn_lockless(mm, data->addr);
 		}
+		if (!pfn && data->addr >= PAGE_OFFSET) {
+			pfn = __pa(data->addr) >> PAGE_SHIFT;
+		}
+	}
+
+	if (!pfn && (data->sample_flags & PERF_SAMPLE_IP) && data->ip) {
+		struct mm_struct *mm = current->mm;
+		if (mm) {
+			pfn = virt_to_pfn_lockless(mm, data->ip);
+		}
+		if (!pfn && data->ip >= PAGE_OFFSET) {
+			pfn = __pa(data->ip) >> PAGE_SHIFT;
+		}
+	}
+
+	if (!pfn && regs && instruction_pointer(regs)) {
+		unsigned long ip = instruction_pointer(regs);
+		struct mm_struct *mm = current->mm;
+		if (mm) {
+			pfn = virt_to_pfn_lockless(mm, ip);
+		}
+		if (!pfn && ip >= PAGE_OFFSET) {
+			pfn = __pa(ip) >> PAGE_SHIFT;
+		}
 	}
 
 	if (pfn && pfn_valid(pfn)) {
-		if (tiered_page_counters && pfn < max_pfn) {
+		struct tiered_mem_ops *ops;
+
+		rcu_read_lock();
+		ops = rcu_dereference(active_tiered_ops);
+		if (ops && ops->track_access) {
+			ops->track_access(pfn);
+			pr_info("tiered_mem:overflow_handler: using eBPF to track access for page %lu\n", pfn);
+		} else if (tiered_page_counters && pfn < max_pfn) {
 			atomic_inc(&tiered_page_counters[pfn]);
+			pr_info("tiered_mem:overflow_handler: using hardware counters to track access for page %lu\n", pfn);
 		}
+		rcu_read_unlock();
 	} else {
 		total_pebs_errors++;
 	}
@@ -165,7 +198,7 @@ int tiered_pebs_init(void)
 		}
 		if (IS_ERR(event)) {
 			/* If hardware creation fails, clean up and set up software sampler */
-			pr_warn("tiered_mem: PMU/PEBS hardware events not available (err=%ld). Falling back to Software Page-Table Sampler.\n", PTR_ERR(event));
+			pr_info("tiered_mem: PMU/PEBS hardware events not available (err=%ld). Falling back to Software Page-Table Sampler.\n", PTR_ERR(event));
 			tiered_pebs_cleanup();
 			use_software_sampler = true;
 			return 0;
@@ -265,10 +298,20 @@ static void tiered_software_sampler_fn(struct work_struct *work)
 
 		scanned++;
 		if (folio_referenced(folio, 0, NULL, &vm_flags) > 0) {
-			if (tiered_page_counters && pfn < max_pfn) {
+			struct tiered_mem_ops *ops;
+
+			rcu_read_lock();
+			ops = rcu_dereference(active_tiered_ops);
+			if (ops && ops->track_access) {
+				ops->track_access(pfn);
+				total_pebs_samples++;
+				pr_info("tiered_mem: using eBPF to track access for page %lu\n", pfn);
+			} else if (tiered_page_counters && pfn < max_pfn) {
 				atomic_inc(&tiered_page_counters[pfn]);
 				total_pebs_samples++;
+				pr_info("tiered_mem: using hardware counters to track access for page %lu\n", pfn);
 			}
+			rcu_read_unlock();
 		}
 	}
 	next_pfn = pfn;

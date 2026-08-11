@@ -46,6 +46,23 @@ extern unsigned int cold_threshold;
 extern struct bpf_prog *tiered_ebpf_prog;
 extern struct mutex tiered_ebpf_mutex;
 
+struct tiered_mem_ops {
+	int (*init)(struct tiered_mem_ops *ops);
+	void (*track_access)(unsigned long pfn);
+	int (*get_hot_pages)(int page_count, struct list_head *list);
+	int (*get_cold_pages)(int page_count, struct list_head *list);
+	char name[16];
+	struct module *owner;
+};
+
+extern struct tiered_mem_ops __rcu *active_tiered_ops;
+int tiered_struct_ops_init(void);
+
+void *bpf_tiered_mem_create_counters(void);
+int bpf_tiered_mem_inc_counter_array(void *arr_ptr, unsigned long pfn);
+int bpf_tiered_mem_get_counter_array(void *arr_ptr, unsigned long pfn);
+int tiered_mem_get_access_count(unsigned long pfn);
+
 extern struct mutex tiered_mem_config_mutex;
 
 /* Policy structure */

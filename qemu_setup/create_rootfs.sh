@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="$SCRIPT_DIR/ubuntu-rootfs.img"
-IMAGE_SIZE="7G"
+IMAGE_SIZE="20G"
 MOUNT_DIR="$SCRIPT_DIR/mnt_rootfs"
 RELEASE="jammy" # Ubuntu 22.04 LTS
 
@@ -15,6 +15,10 @@ if [ "$EUID" -ne 0 ]; then
     echo "    Please run as: sudo ./create_rootfs.sh"
     exit 1
 fi
+
+# Make the wget wrapper executable and prepend it to PATH
+chmod +x "$SCRIPT_DIR/bin/wget"
+export PATH="$SCRIPT_DIR/bin:$PATH"
 
 echo "[+] Creating raw disk image of size $IMAGE_SIZE..."
 qemu-img create -f raw "$IMAGE_NAME" "$IMAGE_SIZE"
@@ -31,6 +35,10 @@ mount "$IMAGE_NAME" "$MOUNT_DIR"
 # Cleanup trap to ensure we always unmount on failure or exit
 cleanup() {
     echo "[+] Cleaning up mounts..."
+    if [ -f "$MOUNT_DIR/debootstrap/debootstrap.log" ]; then
+        cp "$MOUNT_DIR/debootstrap/debootstrap.log" "$SCRIPT_DIR/debootstrap.log"
+        echo "[+] Saved debootstrap log to $SCRIPT_DIR/debootstrap.log"
+    fi
     if mountpoint -q "$MOUNT_DIR"; then
         umount "$MOUNT_DIR"
     fi
@@ -43,8 +51,8 @@ trap cleanup EXIT
 echo "[+] Running debootstrap for Ubuntu $RELEASE (this may take a few minutes)..."
 # Installs core utilities plus benchmark and diagnostics tools
 debootstrap --arch=amd64 \
-            --include=systemd,udev,dbus,iproute2,netplan.io,kmod,sudo,openssh-server,numactl,pciutils,procps,iputils-ping,nano,curl,gcc,make,clang,llvm,libbpf-dev,libelf-dev \
-            "$RELEASE" "$MOUNT_DIR" http://archive.ubuntu.com/ubuntu/
+            --include=systemd,udev,dbus,iproute2,netplan.io,kmod,sudo,openssh-server,numactl,pciutils,procps,iputils-ping,nano,curl \
+            "$RELEASE" "$MOUNT_DIR" https://archive.ubuntu.com/ubuntu/
 
 echo "[+] Configuring system files..."
 
@@ -64,9 +72,9 @@ ff02::1     ip6-allnodes
 ff02::2     ip6-allrouters
 EOF
 
-# 3. Configure fstab
+# 3. Configure fstab (pass=0 on root to skip fsck and avoid emergency mode)
 cat <<EOF > "$MOUNT_DIR/etc/fstab"
-/dev/vda        /               ext4    defaults        0       1
+/dev/vda        /               ext4    defaults        0       0
 devtmpfs        /dev            devtmpfs defaults       0       0
 sysfs           /sys            sysfs   defaults        0       0
 proc            /proc           proc    defaults        0       0
@@ -98,9 +106,9 @@ EOF
 
 # 7. Configure apt sources to include universe repository
 cat <<EOF > "$MOUNT_DIR/etc/apt/sources.list"
-deb http://archive.ubuntu.com/ubuntu/ $RELEASE main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu/ $RELEASE-updates main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu/ $RELEASE-security main restricted universe multiverse
+deb https://archive.ubuntu.com/ubuntu/ $RELEASE main restricted universe multiverse
+deb https://archive.ubuntu.com/ubuntu/ $RELEASE-updates main restricted universe multiverse
+deb https://security.ubuntu.com/ubuntu/ $RELEASE-security main restricted universe multiverse
 EOF
 
 echo "[+] Mounting dev, sys, proc inside rootfs to run additional configurations..."
@@ -118,13 +126,23 @@ cleanup_binds() {
 }
 trap cleanup_binds EXIT
 
-# 8. Enable sshd and networkd services, and install stress-ng from universe
+# 8. Enable sshd and networkd services
 chroot "$MOUNT_DIR" systemctl enable systemd-networkd
 chroot "$MOUNT_DIR" systemctl enable ssh
 
+# Mask systemd-fsck-root to prevent emergency mode and /run/nologin
+chroot "$MOUNT_DIR" systemctl mask systemd-fsck-root.service
+
+# Create sshd privilege separation directory (required by OpenSSH)
+mkdir -p "$MOUNT_DIR/etc/tmpfiles.d"
+echo 'd /run/sshd 0755 root root -' > "$MOUNT_DIR/etc/tmpfiles.d/sshd.conf"
+
+# Allow root login over SSH with password
+echo "PermitRootLogin yes" >> "$MOUNT_DIR/etc/ssh/sshd_config"
+
 echo "[+] Updating apt repositories and installing stress-ng..."
-chroot "$MOUNT_DIR" apt-get update
-chroot "$MOUNT_DIR" apt-get install -y stress-ng
+chroot "$MOUNT_DIR" apt-get -o Acquire::Retries=5 update
+chroot "$MOUNT_DIR" apt-get -o Acquire::Retries=5 install -y stress-ng
 
 echo "[+] Rootfs image '$IMAGE_NAME' created and configured successfully!"
 echo "[+] Default root password is: 'root'"
@@ -132,5 +150,4 @@ echo "[+] Autologin is configured on serial console ttyS0."
 
 
 # echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
-# systemctl restart ssh
 # systemctl restart ssh

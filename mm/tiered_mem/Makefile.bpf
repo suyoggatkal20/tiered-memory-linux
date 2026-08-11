@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-2.0
+# Makefile for compiling, registering, deregistering, and monitoring Tiered Memory eBPF struct_ops programs.
+
+CLANG ?= clang
+BPFTOOL ?= bpftool
+
+SRC := tiered_struct_ops.bpf.c
+OBJ := tiered_struct_ops.bpf.o
+OPS_NAME := custom_pebs_ops
+
+CFLAGS := -g -O2 -target bpf -I/usr/include/x86_64-linux-gnu
+
+.PHONY: all compile register deregister unregister unreg list trace clean
+
+all: compile
+
+compile: $(OBJ)
+
+$(OBJ): $(SRC)
+	@echo "  CLANG (BPF) $@"
+	$(CLANG) $(CFLAGS) -c $< -o $@
+
+register: $(OBJ)
+	@echo "  REGISTER $(OBJ)"
+	sudo $(BPFTOOL) struct_ops register $(OBJ)
+
+deregister:
+	@echo "  UNREGISTER $(OPS_NAME)"
+	-sudo $(BPFTOOL) struct_ops unregister name $(OPS_NAME)
+
+unregister: deregister
+unreg: deregister
+
+list:
+	@echo "  LIST STRUCT_OPS"
+	sudo $(BPFTOOL) struct_ops list
+
+trace:
+	@echo "  TRACE LOG (Ctrl+C to exit)"
+	sudo $(BPFTOOL) prog tracelog
+
+clean:
+	@echo "  CLEAN BPF OBJECTS"
+	rm -f $(OBJ)

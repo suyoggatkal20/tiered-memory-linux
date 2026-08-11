@@ -1,3 +1,17 @@
+/*
+ * Userspace loader for the Tiered Memory eBPF policy program.
+ *
+ * Usage: ./tiered_policy_user <bpf_object_file>
+ *
+ * This program:
+ *   1. Opens the compiled BPF object (.o file)
+ *   2. Sets the program type to BPF_PROG_TYPE_TIERED_MEM (33)
+ *   3. Loads it into the kernel
+ *   4. Writes the program FD to /sys/kernel/tiered_memory/ebpf_prog_fd
+ *   5. Keeps running (holds the FD open) until Ctrl+C
+ *
+ * Compile: gcc -O2 -o tiered_policy_user tiered_policy_user.c -lbpf
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,25 +49,20 @@ int main(int argc, char **argv)
 	}
 
 	prog = bpf_object__find_program_by_title(obj, "tiered_mem");
-	if (!prog) {
-		/* Fallback: try first program in the object */
+	if (!prog)
+		prog = bpf_object__find_program_by_title(obj, "socket");
+	if (!prog)
 		prog = bpf_program__next(NULL, obj);
-	}
 	if (!prog) {
 		fprintf(stderr, "No programs found in BPF object\n");
 		bpf_object__close(obj);
 		return 1;
 	}
 
-	/* BPF_PROG_TYPE_TIERED_MEM is 33 */
 	bpf_program__set_type(prog, 33);
 
-	struct bpf_object_load_attr load_attr = {
-		.obj = obj,
-		.log_level = 2,
-	};
-
-	err = bpf_object__load_xattr(&load_attr);
+	
+	err = bpf_object__load(obj);
 	if (err) {
 		fprintf(stderr, "Failed to load BPF object: %d\n", err);
 		bpf_object__close(obj);
@@ -87,7 +96,7 @@ int main(int argc, char **argv)
 	close(sysfs_fd);
 	printf("Successfully attached eBPF policy to /sys/kernel/tiered_memory/ebpf_prog_fd!\n");
 
-	printf("Press Ctrl+C to exit...\n");
+	printf("Press Ctrl+C to exit and detach...\n");
 	while (1) {
 		sleep(1);
 	}

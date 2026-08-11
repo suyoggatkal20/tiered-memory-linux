@@ -460,6 +460,11 @@ static int __init tiered_mem_init(void)
 		return err;
 	}
 
+	err = tiered_struct_ops_init();
+	if (err) {
+		pr_warn("tiered_mem: failed to register bpf struct_ops: %d\n", err);
+	}
+
 	err = tiered_debugfs_init();
 	if (err) {
 		tiered_policy_cleanup();

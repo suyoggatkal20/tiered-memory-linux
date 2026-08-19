@@ -9,6 +9,8 @@
 #include <linux/perf_event.h>
 #include <linux/workqueue.h>
 
+#include <linux/bpf.h>
+
 /* Global config variables */
 extern bool tiered_mem_enabled;
 extern bool tiered_mem_verbose;
@@ -43,12 +45,13 @@ extern u64 safety_check_failures;
 extern unsigned int hot_threshold;
 extern unsigned int cold_threshold;
 
-extern struct bpf_prog *tiered_ebpf_prog;
 extern struct mutex tiered_ebpf_mutex;
 
 struct tiered_mem_ops {
 	int (*init)(struct tiered_mem_ops *ops);
-	void (*track_access)(unsigned long pfn);
+	void (*track_access)(struct tiered_mem_ebpf_ctx *ctx);
+	void (*age_page)(unsigned long pfn);
+	int (*classify_page)(struct tiered_mem_ebpf_ctx *ctx);
 	int (*get_hot_pages)(int page_count, struct list_head *list);
 	int (*get_cold_pages)(int page_count, struct list_head *list);
 	char name[16];

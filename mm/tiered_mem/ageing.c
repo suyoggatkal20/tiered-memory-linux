@@ -7,37 +7,56 @@
 static void tiered_ageing_work_fn(struct work_struct *work)
 {
 	unsigned long pfn;
+	struct tiered_mem_ops *ops;
 
 	if (!tiered_mem_enabled || !ageing_enabled)
 		return;
 
 	ageing_runs++;
 
-	for (pfn = 0; pfn < max_pfn; pfn++) {
-		struct page *page;
-		int old, new_val;
+	rcu_read_lock();
+	ops = rcu_dereference(active_tiered_ops);
 
-		if ((pfn & 0xff) == 0)
-			cond_resched();
+	if (ops && ops->age_page) {
+		for (pfn = 0; pfn < max_pfn; pfn++) {
+			if ((pfn & 0xff) == 0)
+				cond_resched();
 
-		if (!pfn_valid(pfn))
-			continue;
+			if (!pfn_valid(pfn))
+				continue;
 
-		page = pfn_to_online_page(pfn);
-		if (!page)
-			continue;
+			ops->age_page(pfn);
+		}
+		if (tiered_mem_verbose)
+			pr_info("tiered_mem: executed eBPF struct_ops age_page loop\n");
+	} else {
+		for (pfn = 0; pfn < max_pfn; pfn++) {
+			struct page *page;
+			int old, new_val;
 
-		if (tiered_page_counters) {
-			old = atomic_read(&tiered_page_counters[pfn]);
-			if (old > 0) {
-				new_val = (old * ageing_factor) / 100;
-				while (atomic_cmpxchg(&tiered_page_counters[pfn], old, new_val) != old) {
-					old = atomic_read(&tiered_page_counters[pfn]);
+			if ((pfn & 0xff) == 0)
+				cond_resched();
+
+			if (!pfn_valid(pfn))
+				continue;
+
+			page = pfn_to_online_page(pfn);
+			if (!page)
+				continue;
+
+			if (tiered_page_counters) {
+				old = atomic_read(&tiered_page_counters[pfn]);
+				if (old > 0) {
 					new_val = (old * ageing_factor) / 100;
+					while (atomic_cmpxchg(&tiered_page_counters[pfn], old, new_val) != old) {
+						old = atomic_read(&tiered_page_counters[pfn]);
+						new_val = (old * ageing_factor) / 100;
+					}
 				}
 			}
 		}
 	}
+	rcu_read_unlock();
 
 	schedule_delayed_work(&tiered_mem_ageing_work, msecs_to_jiffies(ageing_interval));
 }

@@ -1093,7 +1093,6 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_SK_LOOKUP,
 	BPF_PROG_TYPE_SYSCALL, /* a program that can execute syscalls */
 	BPF_PROG_TYPE_NETFILTER,
-	BPF_PROG_TYPE_TIERED_MEM,
 	__MAX_BPF_PROG_TYPE
 };
 
@@ -6146,6 +6145,7 @@ union bpf_attr {
 	FN(tiered_mem_create_page_counters, 212, ##ctx)	\
 	FN(tiered_mem_inc_page_counter, 213, ##ctx)	\
 	FN(tiered_mem_get_page_counter, 214, ##ctx)	\
+	FN(tiered_mem_decay_page_counter, 215, ##ctx)	\
 	/* This helper list is effectively frozen. If you are trying to	\
 	 * add a new helper, you should add a kfunc instead which has	\
 	 * less stability guarantees. See Documentation/bpf/kfuncs.rst	\

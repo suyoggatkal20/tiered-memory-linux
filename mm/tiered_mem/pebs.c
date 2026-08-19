@@ -42,11 +42,6 @@ static unsigned long virt_to_pfn_lockless(struct mm_struct *mm,
 	if (pmd_none(*pmd))
 		return 0;
 
-	if (pmd_leaf(*pmd) || pmd_trans_huge(*pmd)) {
-		pfn = pmd_pfn(*pmd) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
-		return pfn;
-	}
-
 	ptep = pte_offset_kernel(pmd, addr);
 	if (ptep) {
 		pte = *ptep;
@@ -56,6 +51,47 @@ static unsigned long virt_to_pfn_lockless(struct mm_struct *mm,
 	}
 
 	return pfn;
+}
+
+static void populate_ebpf_ctx(struct tiered_mem_ebpf_ctx *ctx, unsigned long pfn)
+{
+	struct page *page = pfn_to_online_page(pfn);
+	struct folio *folio = NULL;
+	int nid = 0;
+	unsigned long long zone_free_pages = 0;
+	unsigned long long node_total_pages = 0;
+
+	if (page && !PageTail(page)) {
+		folio = page_folio(page);
+		nid = page_to_nid(page);
+	} else if (pfn_valid(pfn)) {
+		nid = pfn_to_nid(pfn);
+	}
+
+	if (nid >= 0 && nid < MAX_NUMNODES && node_online(nid)) {
+		pg_data_t *pgdat = NODE_DATA(nid);
+		if (pgdat) {
+			int i;
+			node_total_pages = pgdat->node_present_pages;
+			for (i = 0; i < MAX_NR_ZONES; i++) {
+				struct zone *zone = &pgdat->node_zones[i];
+				if (populated_zone(zone))
+					zone_free_pages += zone_page_state(zone, NR_FREE_PAGES);
+			}
+		}
+	}
+
+	ctx->pfn = pfn;
+	ctx->nid = nid;
+	ctx->access_count = tiered_mem_get_access_count(pfn);
+	ctx->is_lru = folio ? (folio_test_lru(folio) ? 1 : 0) : 0;
+	ctx->is_active = folio ? (folio_test_active(folio) ? 1 : 0) : 0;
+	ctx->page_order = folio ? folio_order(folio) : 0;
+	ctx->is_referenced = folio ? (folio_test_referenced(folio) ? 1 : 0) : 0;
+	ctx->is_dirty = folio ? (folio_test_dirty(folio) ? 1 : 0) : 0;
+	ctx->is_writeback = folio ? (folio_test_writeback(folio) ? 1 : 0) : 0;
+	ctx->zone_free_pages = zone_free_pages;
+	ctx->node_total_pages = node_total_pages;
 }
 
 static void tiered_pebs_overflow_handler(struct perf_event *event,
@@ -118,7 +154,9 @@ static void tiered_pebs_overflow_handler(struct perf_event *event,
 		rcu_read_lock();
 		ops = rcu_dereference(active_tiered_ops);
 		if (ops && ops->track_access) {
-			ops->track_access(pfn);
+			struct tiered_mem_ebpf_ctx ctx;
+			populate_ebpf_ctx(&ctx, pfn);
+			ops->track_access(&ctx);
 			pr_info("tiered_mem:overflow_handler: using eBPF to track access for page %lu\n", pfn);
 		} else if (tiered_page_counters && pfn < max_pfn) {
 			atomic_inc(&tiered_page_counters[pfn]);
@@ -303,7 +341,9 @@ static void tiered_software_sampler_fn(struct work_struct *work)
 			rcu_read_lock();
 			ops = rcu_dereference(active_tiered_ops);
 			if (ops && ops->track_access) {
-				ops->track_access(pfn);
+				struct tiered_mem_ebpf_ctx ctx;
+				populate_ebpf_ctx(&ctx, pfn);
+				ops->track_access(&ctx);
 				total_pebs_samples++;
 				pr_info("tiered_mem: using eBPF to track access for page %lu\n", pfn);
 			} else if (tiered_page_counters && pfn < max_pfn) {

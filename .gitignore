@@ -196,3 +196,4 @@ sphinx_*/
 !kernel/time/timeconst.bc
 qemu_setup/ubuntu-rootfs.img
 *.imgubuntu-rootfs.img
+ubuntu-rootfs.img

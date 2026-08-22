@@ -8741,6 +8741,23 @@ void perf_prepare_sample(struct perf_sample_data *data,
 		data->sample_flags |= PERF_SAMPLE_PHYS_ADDR;
 	}
 
+	/* Tiered Memory Hook 5 Debug Printing with target_pid & enable filtering */
+	{
+		extern bool hook4_debug_enable;
+		extern unsigned int target_pid;
+		if (hook4_debug_enable && (target_pid == 0 || current->pid == target_pid || current->tgid == target_pid)) {
+			u64 phys = data->phys_addr ? data->phys_addr : perf_virt_to_phys(data->addr);
+			u64 pfn = phys >> PAGE_SHIFT;
+			u64 latency = data->weight.full;
+			u64 dsrc = data->data_src.val;
+
+			printk_ratelimited(KERN_INFO "tiered_mem:HOOK5: PID=%d TGID=%d COMM=%s vaddr=0x%llx phys=0x%llx PFN=%llu lat=%llu dsrc=0x%llx\n",
+					   current->pid, current->tgid, current->comm,
+					   data->addr, phys, pfn,
+					   latency, dsrc);
+		}
+	}
+
 #ifdef CONFIG_CGROUP_PERF
 	if (filtered_sample_type & PERF_SAMPLE_CGROUP) {
 		struct cgroup *cgrp;

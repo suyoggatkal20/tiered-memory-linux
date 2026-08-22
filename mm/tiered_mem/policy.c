@@ -120,19 +120,8 @@ static int default_get_hot_pages(int page_count, struct list_head *list)
 					bool has_bpf_classify = false;
 					u32 decision = 0;
 
-					struct tiered_mem_ebpf_ctx ctx = {
-						.pfn = pfn,
-						.nid = nid,
-						.access_count = access_count,
-						.is_lru = folio_test_lru(folio) ? 1 : 0,
-						.is_active = folio_test_active(folio) ? 1 : 0,
-						.page_order = folio_order(folio),
-						.is_referenced = folio_test_referenced(folio) ? 1 : 0,
-						.is_dirty = folio_test_dirty(folio) ? 1 : 0,
-						.is_writeback = folio_test_writeback(folio) ? 1 : 0,
-						.zone_free_pages = zone_page_state(page_zone(page), NR_FREE_PAGES),
-						.node_total_pages = NODE_DATA(nid)->node_present_pages,
-					};
+					struct tiered_mem_ebpf_ctx ctx;
+					populate_ebpf_ctx(&ctx, pfn);
 
 					rcu_read_lock();
 					ops = rcu_dereference(active_tiered_ops);
@@ -235,19 +224,8 @@ static int default_get_cold_pages(int page_count, struct list_head *list)
 					bool has_bpf_classify = false;
 					u32 decision = 0;
 
-					struct tiered_mem_ebpf_ctx ctx = {
-						.pfn = pfn,
-						.nid = nid,
-						.access_count = access_count,
-						.is_lru = folio_test_lru(folio) ? 1 : 0,
-						.is_active = folio_test_active(folio) ? 1 : 0,
-						.page_order = folio_order(folio),
-						.is_referenced = folio_test_referenced(folio) ? 1 : 0,
-						.is_dirty = folio_test_dirty(folio) ? 1 : 0,
-						.is_writeback = folio_test_writeback(folio) ? 1 : 0,
-						.zone_free_pages = zone_page_state(page_zone(page), NR_FREE_PAGES),
-						.node_total_pages = NODE_DATA(nid)->node_present_pages,
-					};
+					struct tiered_mem_ebpf_ctx ctx;
+					populate_ebpf_ctx(&ctx, pfn);
 
 					rcu_read_lock();
 					ops = rcu_dereference(active_tiered_ops);

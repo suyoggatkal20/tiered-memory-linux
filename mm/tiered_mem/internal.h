@@ -24,10 +24,11 @@ extern unsigned int ageing_factor;
 extern unsigned int ktierd_interval;
 extern unsigned int promotion_batch;
 extern unsigned int demotion_batch;
-extern unsigned int max_scan;
 extern u64 pebs_event_config;
 extern bool ageing_enabled;
 extern bool ktierd_enabled;
+extern unsigned int target_pid;
+extern bool hook4_debug_enable;
 
 /* Statistics */
 extern u64 total_pebs_samples;
@@ -65,6 +66,7 @@ void *bpf_tiered_mem_create_counters(void);
 int bpf_tiered_mem_inc_counter_array(void *arr_ptr, unsigned long pfn);
 int bpf_tiered_mem_get_counter_array(void *arr_ptr, unsigned long pfn);
 int tiered_mem_get_access_count(unsigned long pfn);
+void populate_ebpf_ctx(struct tiered_mem_ebpf_ctx *ctx, unsigned long pfn);
 
 extern struct mutex tiered_mem_config_mutex;
 

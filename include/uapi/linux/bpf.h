@@ -6375,6 +6375,8 @@ struct tiered_mem_ebpf_ctx {
 	__u32 is_referenced;	/* 1 if page has PG_referenced set */
 	__u32 is_dirty;		/* 1 if page is dirty */
 	__u32 is_writeback;	/* 1 if page is under writeback */
+	__u32 pid;		/* PID (Task ID) of process accessing the page */
+	__u32 tgid;		/* TGID (Process ID / Thread Group ID) */
 	__u64 zone_free_pages;	/* free pages in the page's zone */
 	__u64 node_total_pages;	/* total managed pages on this node */
 };

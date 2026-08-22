@@ -97,7 +97,12 @@ static const struct bpf_func_proto bpf_tiered_mem_get_page_counter_proto = {
 	.arg2_type	= ARG_ANYTHING,
 };
 
-__bpf_kfunc void *bpf_tiered_mem_create_array(void)
+static inline unsigned long normalize_pfn(unsigned long pfn)
+{
+	return max_pfn ? (pfn % max_pfn) : 0;
+}
+
+__bpf_kfunc static void *bpf_tiered_mem_create_array(void)
 {
 	if (!max_pfn)
 		return NULL;
@@ -112,6 +117,7 @@ __bpf_kfunc int bpf_tiered_mem_inc_counter_array(void *arr_ptr, unsigned long ra
 	if (!arr || !max_pfn)
 		return 0;
 
+	pfn = normalize_pfn(raw_pfn);
 	atomic_inc(&arr[pfn]);
 	return atomic_read(&arr[pfn]);
 }
@@ -146,7 +152,7 @@ int tiered_mem_get_access_count(unsigned long raw_pfn)
 }
 EXPORT_SYMBOL_GPL(tiered_mem_get_access_count);
 
-BPF_CALL_3(bpf_tiered_mem_age_page_counter, atomic_t *, arr, unsigned long, raw_pfn, unsigned int, factor)
+BPF_CALL_3(bpf_tiered_mem_decay_page_counter, atomic_t *, arr, unsigned long, raw_pfn, unsigned int, factor)
 {
 	unsigned long pfn;
 	int old, new_val;
@@ -167,8 +173,8 @@ BPF_CALL_3(bpf_tiered_mem_age_page_counter, atomic_t *, arr, unsigned long, raw_
 	return 0;
 }
 
-static const struct bpf_func_proto bpf_tiered_mem_age_page_counter_proto = {
-	.func		= bpf_tiered_mem_age_page_counter,
+static const struct bpf_func_proto bpf_tiered_mem_decay_page_counter_proto = {
+	.func		= bpf_tiered_mem_decay_page_counter,
 	.gpl_only	= true,
 	.ret_type	= RET_INTEGER,
 	.arg1_type	= ARG_ANYTHING,
@@ -314,7 +320,21 @@ static int bpf_tiered_mem_ops_init(struct btf *btf)
 	return 0;
 }
 
+static int bpf_tiered_mem_ops_init_member(const struct btf_type *t,
+					  const struct btf_member *member,
+					  void *kdata, const void *udata)
+{
+	const char *mname;
 
+	mname = btf_name_by_offset(bpf_get_btf_vmlinux(), member->name_off);
+	if (mname && !strcmp(mname, "name")) {
+		memcpy(((struct tiered_mem_ops *)kdata)->name,
+		       ((struct tiered_mem_ops *)udata)->name,
+		       sizeof(((struct tiered_mem_ops *)kdata)->name));
+		return 1;
+	}
+	return 0;
+}
 
 static const struct bpf_verifier_ops tiered_mem_struct_ops_verifier_ops = {
 	.get_func_proto  = tiered_mem_func_proto,
@@ -324,6 +344,7 @@ static const struct bpf_verifier_ops tiered_mem_struct_ops_verifier_ops = {
 struct bpf_struct_ops bpf_tiered_mem_ops = {
 	.verifier_ops = &tiered_mem_struct_ops_verifier_ops,
 	.init = bpf_tiered_mem_ops_init,
+	.init_member = bpf_tiered_mem_ops_init_member,
 	.reg = bpf_tiered_mem_ops_reg,
 	.unreg = bpf_tiered_mem_ops_unreg,
 	.cfi_stubs = &__bpf_tiered_mem_ops,

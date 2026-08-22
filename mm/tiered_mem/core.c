@@ -31,7 +31,6 @@ unsigned int ageing_factor = 50;
 unsigned int ktierd_interval = 2000;
 unsigned int promotion_batch = 128;
 unsigned int demotion_batch = 128;
-unsigned int max_scan = 100000;
 u64 pebs_event_config = 0x20d1; /* MEM_TRANS_RETIRED.LATENCY_ABOVE_THRESHOLD */
 bool ageing_enabled = true;
 bool ktierd_enabled = true;
@@ -39,6 +38,10 @@ bool ktierd_enabled = true;
 /* Thresholds for hot/cold classification */
 unsigned int hot_threshold = 10;
 unsigned int cold_threshold = 1;
+unsigned int target_pid = 0;
+EXPORT_SYMBOL_GPL(target_pid);
+bool hook4_debug_enable = true;
+EXPORT_SYMBOL_GPL(hook4_debug_enable);
 
 /* Statistics */
 u64 total_pebs_samples = 0;
@@ -278,7 +281,7 @@ TIERED_ATTR_RW_UINT(promotion_batch, 1, 10000)
 TIERED_ATTR_RW_UINT(demotion_batch, 1, 10000)
 TIERED_ATTR_RW_UINT(hot_threshold, 0, UINT_MAX)
 TIERED_ATTR_RW_UINT(cold_threshold, 0, UINT_MAX)
-TIERED_ATTR_RW_UINT(max_scan, 1, UINT_MAX)
+TIERED_ATTR_RW_UINT(target_pid, 0, UINT_MAX)
 
 
 static ssize_t verbose_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
@@ -364,6 +367,21 @@ static ssize_t policy_store(struct kobject *kobj, struct kobj_attribute *attr, c
 }
 static struct kobj_attribute policy_attribute = __ATTR_RW(policy);
 
+static ssize_t hook4_debug_enable_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sysfs_emit(buf, "%d\n", hook4_debug_enable);
+}
+static ssize_t hook4_debug_enable_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	bool val;
+	int err = kstrtobool(buf, &val);
+	if (err)
+		return err;
+	hook4_debug_enable = val;
+	return count;
+}
+static struct kobj_attribute hook4_debug_enable_attribute = __ATTR_RW(hook4_debug_enable);
+
 static struct attribute *tiered_mem_attrs[] = {
 	&enable_attribute.attr,
 	&dram_nodes_attribute.attr,
@@ -382,7 +400,8 @@ static struct attribute *tiered_mem_attrs[] = {
 	&ktierd_enabled_attribute.attr,
 	&pebs_event_config_attribute.attr,
 	&policy_attribute.attr,
-	&max_scan_attribute.attr,
+	&target_pid_attribute.attr,
+	&hook4_debug_enable_attribute.attr,
 	NULL,
 };
 

@@ -85,3 +85,50 @@ cat /sys/kernel/debug/tiered_memory/stats
 
 cat /sys/kernel/debug/tiered_memory/page_stats
 
+
+
+./qemu_setup/setup_configs.sh
+grep CONFIG_LOCALVERSION .config
+rm -f include/config/kernel.release
+./scripts/config --set-str CONFIG_LOCALVERSION "-tiered-btf-4"
+rm -f include/config/auto.conf
+rm -f include/config/auto.conf.cmd
+rm -f include/config/kernel.release
+make olddefconfig
+grep CONFIG_LOCALVERSION include/config/auto.conf
+
+make -s kernelrelease
+
+make -j$(nproc) 2>error.log
+readelf -S vmlinux | grep BTF
+
+sudo make modules_install
+sudo make install
+
+
+sudo update-grub
+
+sudo grub-reboot "Advanced options for Ubuntu>Ubuntu, with Linux 7.2.0-rc4-tiered-btf"
+sudo grub-editenv list
+
+sudo reboot
+
+echo 0 | sudo tee /sys/kernel/tiered_memory/target_pid
+
+
+echo 4240 | sudo tee /sys/kernel/tiered_memory/target_pid
+
+
+
+# hook4 enable/disable
+# Enable tiered memory framework
+echo 1 | sudo tee /sys/kernel/tiered_memory/enable
+
+# Enable Hook 4 logging (enabled by default)
+echo 1 | sudo tee /sys/kernel/tiered_memory/hook4_debug_enable
+
+# Optional: filter by PID (0 = all PIDs)
+echo 4370 | sudo tee /sys/kernel/tiered_memory/target_pid
+
+# Watch output in dmesg
+dmesg -w | grep "tiered_mem:HOOK4"

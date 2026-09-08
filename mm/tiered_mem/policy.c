@@ -89,6 +89,7 @@ static int default_get_hot_pages(int page_count, struct list_head *list)
 		int i;
 
 		for (i = 0; i < MAX_NR_ZONES; i++) {
+			// need to fix we must ensure that scanning for pages start from last scanned zone not 0 zone
 			struct zone *zone = &pgdat->node_zones[i];
 			if (!populated_zone(zone))
 				continue;

@@ -43,7 +43,7 @@ trap cleanup EXIT
 echo "[+] Running debootstrap for Ubuntu $RELEASE (this may take a few minutes)..."
 # Installs core utilities plus benchmark and diagnostics tools
 debootstrap --arch=amd64 \
-            --include=systemd,udev,dbus,iproute2,netplan.io,kmod,sudo,openssh-server,numactl,pciutils,procps,iputils-ping,nano,curl,gcc,make,clang,llvm,libbpf-dev,libelf-dev \
+            --include=systemd,udev,dbus,iproute2,netplan.io,kmod,sudo,openssh-server,numactl,pciutils,procps,iputils-ping,nano,curl \
             "$RELEASE" "$MOUNT_DIR" http://archive.ubuntu.com/ubuntu/
 
 echo "[+] Configuring system files..."
@@ -122,9 +122,9 @@ trap cleanup_binds EXIT
 chroot "$MOUNT_DIR" systemctl enable systemd-networkd
 chroot "$MOUNT_DIR" systemctl enable ssh
 
-echo "[+] Updating apt repositories and installing stress-ng..."
+echo "[+] Updating apt repositories and installing tools..."
 chroot "$MOUNT_DIR" apt-get update
-chroot "$MOUNT_DIR" apt-get install -y stress-ng
+chroot "$MOUNT_DIR" apt-get install -y stress-ng gcc make clang llvm libbpf-dev libelf-dev
 
 echo "[+] Rootfs image '$IMAGE_NAME' created and configured successfully!"
 echo "[+] Default root password is: 'root'"

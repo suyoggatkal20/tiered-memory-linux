@@ -57,6 +57,22 @@ int get_demotion_target_node(int source_nid)
 	return NUMA_NO_NODE;
 }
 
+static struct folio *tiered_alloc_migration_target(struct folio *src, unsigned long private)
+{
+	struct folio *dst = alloc_migration_target(src, private);
+
+	if (dst) {
+		unsigned long src_pfn = folio_pfn(src);
+		unsigned long dst_pfn = folio_pfn(dst);
+
+		if (tiered_page_counters && src_pfn < max_pfn && dst_pfn < max_pfn) {
+			int count = atomic_xchg(&tiered_page_counters[src_pfn], 0);
+			atomic_set(&tiered_page_counters[dst_pfn], count);
+		}
+	}
+	return dst;
+}
+
 int migrate_hot_pages(struct list_head *list)
 {
 	struct migration_target_control mtc = {0};
@@ -84,7 +100,7 @@ int migrate_hot_pages(struct list_head *list)
 	mtc.reason = MR_SYSCALL;
 
 	lru_cache_disable();
-	migrate_pages(list, alloc_migration_target, NULL, (unsigned long)&mtc,
+	migrate_pages(list, tiered_alloc_migration_target, NULL, (unsigned long)&mtc,
 		      MIGRATE_SYNC, MR_SYSCALL, &succeeded);
 	lru_cache_enable();
 
@@ -127,7 +143,7 @@ int migrate_cold_pages(struct list_head *list)
 	mtc.reason = MR_SYSCALL;
 
 	lru_cache_disable();
-	migrate_pages(list, alloc_migration_target, NULL, (unsigned long)&mtc,
+	migrate_pages(list, tiered_alloc_migration_target, NULL, (unsigned long)&mtc,
 		      MIGRATE_SYNC, MR_SYSCALL, &succeeded);
 	lru_cache_enable();
 

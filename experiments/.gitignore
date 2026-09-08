@@ -1,0 +1,16 @@
+# Ignore compiled binaries in experiment directories
+c_real_app
+cxl_workload
+loader
+policy_ebpf.o
+verify_sampler
+
+# Ignore result outputs and logs
+results/
+*.csv
+*.log
+numa_*.txt
+
+# Python bytecode
+__pycache__/
+*.pyc

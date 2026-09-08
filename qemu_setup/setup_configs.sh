@@ -48,6 +48,22 @@ echo "[+] Tuning kernel configuration for Tiered Memory and GDB Debugging..."
 ./scripts/config --enable CONFIG_BPF_EVENTS
 ./scripts/config --enable CONFIG_DEBUG_INFO_BTF
 
+# Network Drivers for Real Machines (Intel Wifi, Common Ethernet, USB Ethernet)
+./scripts/config --enable CONFIG_IWLWIFI
+./scripts/config --enable CONFIG_IWLMVM
+./scripts/config --enable CONFIG_IGB
+./scripts/config --enable CONFIG_IXGBE
+./scripts/config --enable CONFIG_I40E
+./scripts/config --enable CONFIG_ICE
+./scripts/config --enable CONFIG_MLX5_CORE
+./scripts/config --enable CONFIG_MLX5_CORE_EN
+./scripts/config --enable CONFIG_MLX5_CORE_IPOIB
+./scripts/config --enable CONFIG_USB_NET_DRIVERS
+./scripts/config --enable CONFIG_USB_USBNET
+./scripts/config --enable CONFIG_USB_RTL8152
+./scripts/config --enable CONFIG_USB_NET_AX8817X
+./scripts/config --enable CONFIG_USB_NET_AX88179_178A
+
 # Apply changes and generate updated config
 echo "[+] Running 'make olddefconfig' to finalize config dependencies..."
 make olddefconfig

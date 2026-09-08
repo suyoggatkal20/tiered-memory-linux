@@ -10,6 +10,7 @@
 #include <linux/workqueue.h>
 
 /* Global config variables */
+extern atomic_t *tiered_page_counters;
 extern bool tiered_mem_enabled;
 extern bool tiered_mem_verbose;
 extern nodemask_t dram_nodes_mask;

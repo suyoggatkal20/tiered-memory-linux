@@ -40,27 +40,59 @@ Launch QEMU with the compiled kernel and rootfs disk image. The VM is configured
 
 ```bash
 sudo ./qemu_setup/run_qemu.sh
+```
+*(To exit the QEMU console, press `Ctrl+A` then `X`)*.
 
-# echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
-# systemctl restart ssh
-# systemctl restart ssh
+---
 
+### Step 6: Install `bpftool` (Optional, Recommended for Debugging)
 
-<!-- old: -->
-<!-- cd /sys/kernel/tiered_memory
-echo 0 > dram_nodes
-echo 1 > cxl_nodes
-echo 5 > hot_threshold
-echo 0 > cold_threshold
-echo 1000 > sampling_interval
-echo 2000 > ageing_interval
-echo 50 > ageing_factor
-echo 2000 > ktierd_interval
-echo 256 > promotion_batch
-echo 256 > demotion_batch
-echo 1 > enable -->
+To inspect BPF programs, maps, and generate helper files like `vmlinux.h` in the guest VM, compile `bpftool` on the host and copy it to the guest VM:
 
+1. **Compile `bpftool` on the host**:
+   ```bash
+   cd tools/bpf/bpftool
+   make -j$(nproc)
+   ```
+2. **Copy the compiled `bpftool` binary to the VM**:
+   ```bash
+   scp -P 2222 bpftool root@localhost:/usr/local/bin/
+   ```
 
+---
+
+### Step 7: Compile and Attach the eBPF Policy (Inside the VM)
+
+Once logged into the VM, compile and load your custom migration policy:
+
+1. **Compile the eBPF Policy Bytecode**:
+   ```bash
+   clang -O2 -target bpf -I/usr/include/x86_64-linux-gnu -c /root/policy_ebpf.c -o /root/policy_ebpf.o
+   ```
+
+2. **Compile the Loader Utility**:
+   ```bash
+   gcc -O2 /root/loader.c -o /root/loader -lbpf
+   ```
+
+3. **Run the Loader to Load & Attach the Policy**:
+   ```bash
+   /root/loader /root/policy_ebpf.o
+   ```
+   *Note: Press `Ctrl+C` once it displays `Successfully attached eBPF policy...`. The kernel retains the reference to the program.*
+
+4. **Verify the Attached Status**:
+   ```bash
+   cat /sys/kernel/tiered_memory/ebpf_prog_fd
+   ```
+   It should output `attached`.
+
+---
+
+### Step 8: Configure and Enable the Tiered Memory Framework
+Configure the NUMA layout and fine-tune the page scanning and ageing intervals:
+
+```bash
 cd /sys/kernel/tiered_memory
 echo 0 > dram_nodes
 echo 1 > cxl_nodes
@@ -75,13 +107,27 @@ echo 0 > cold_threshold
 echo 2000 > ktierd_interval
 echo 256 > promotion_batch
 echo 256 > demotion_batch
+
+# Enable the tiered memory framework
 echo 1 > enable
+```
+
+### Step 9: Run Stress Workloads and Monitor Migrations
+Run memory-intensive workloads to trigger access tracking and page migrations:
 
 
-
+```bash
 stress-ng --vm 2 --vm-bytes 1G --timeout 300s
+```
 
+Check the migration statistics in debugfs:
+
+```bash
 cat /sys/kernel/debug/tiered_memory/stats
+```
 
-cat /sys/kernel/debug/tiered_memory/page_stats
-
+### Step 10: View `bpf_printk` Logs
+To view output print statements from the eBPF policy (`bpf_printk`), read the kernel trace pipe:
+```bash
+cat /sys/kernel/debug/tracing/trace_pipe
+```

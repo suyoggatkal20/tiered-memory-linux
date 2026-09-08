@@ -19,11 +19,21 @@ static bool tiered_mem_is_valid_access(int off, int size, enum bpf_access_type t
 
 	return true;
 }
+static const struct bpf_func_proto *tiered_mem_get_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
+{
+	switch (func_id) {
+	case BPF_FUNC_trace_printk:
+		return bpf_get_trace_printk_proto();
+	default:
+		return bpf_base_func_proto(func_id, prog);
+	}
+}
 
 const struct bpf_verifier_ops tiered_mem_verifier_ops = {
-	.get_func_proto  = bpf_base_func_proto,
+	.get_func_proto  = tiered_mem_get_func_proto,
 	.is_valid_access = tiered_mem_is_valid_access,
 };
 
 const struct bpf_prog_ops tiered_mem_prog_ops = {
+	
 };

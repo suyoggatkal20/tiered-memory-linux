@@ -195,3 +195,7 @@ sphinx_*/
 # bc language scripts (not LLVM bitcode)
 !kernel/time/timeconst.bc
 qemu_setup/ubuntu-rootfs.img
+verify_sampler
+sampler_verification_results*.csv
+
+/papers/
